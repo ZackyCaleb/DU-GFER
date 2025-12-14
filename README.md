@@ -13,7 +13,7 @@ To install requirements:
 pip install -r requirements.txt
 ```
 
-## Training
+## Train/test
 
 To train/test the model(s) in the paper, run this command:
 
