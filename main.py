@@ -175,8 +175,6 @@ def run_test(args):
 
     model = Model(device=args.device)
     model.to(args.device)
-    # checkpoint = torch.load("/home/zk/MDG_FER/checkpoints/Model_Q_MSQA_best_R2Others.pth", map_location=args.device, weights_only=False)
-    # checkpoint = torch.load("/home/zk/MDG_FER/checkpoints/ResNet18_mask_best_R2Others.pth", map_location=args.device, weights_only=False)
     checkpoint = torch.load("./checkpoints/1115_model_exp/Model_KE2NT_Q_l_full_best_R2Others.pth", map_location=args.device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     # img_tensor = []
@@ -303,4 +301,5 @@ if __name__ == '__main__':
     # 8. 保存高分辨率图片
     plt.savefig('cosdistance_hist_with_gauss.jpg', dpi=800, bbox_inches='tight', facecolor='white')
     plt.close()
+
 
