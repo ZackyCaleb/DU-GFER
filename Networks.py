@@ -339,16 +339,7 @@ class Model(nn.Module):
         #     'tears, a downward turned mouth, drooping upper eyelids, and a wrinkled forehead.',
         #     'furrowed eyebrows, narrow eyes, tightened lips, and flared nostrils.',
         #     'relaxed facial muscles, a straight mouth, a smooth forehead, and unremarkable eyebrows.']
-        #
-        # # '''What are useful facial muscular movements for the facial expression of neutral? please summarizing these information as a sentence'''
-        # # self.class_descriptor=[
-        # #     "surprise is the frontalis muscle raising the eyebrows and the levator palpebrae superioris widening the eyes, often accompanied by the masseter and pterygoid muscles dropping the jaw open.",
-        # #     "fear is the frontalis muscle raising the eyebrows, the levator palpebrae superioris widening the eyes, and the platysma and associated muscles stretching the lips horizontally.",
-        # #     "disgust is the levator labii superioris and alaque nasi muscles raising the upper lip and wrinkling the nose, as if to block an offensive odor.",
-        # #     "happiness are the combined action of the zygomaticus major pulling the lips up and back and the orbicularis oculi tightening to raise the cheeks and create crow's feet around the eyes.",
-        # #     "sadness is the corrugator supercilii and depressor glabellae pulling the inner eyebrows upward and together, combined with the depressor anguli oris pulling the corners of the mouth downward.",
-        # #     "anger is the corrugator supercilii and procerus muscles lowering and furrowing the eyebrows, combined with the orbicularis oris and mentalis tightening the lips and pushing up the chin.",
-        # #     "neutral facial expression is the minimal engagement of facial muscles, resulting in relaxed frontalis (smooth forehead), orbicularis oculi (soft eyes), and zygomaticus and depressor muscles (a relaxed, non-upturned or downturned mouth)."]
+
         '''Deepseek'''
         # self.class_descriptor =[
         #     "frontalis raising eyebrows and levator palpebrae widening eyes",
@@ -540,17 +531,6 @@ class Model(nn.Module):
         #     # L1_reg = 0.001 * torch.abs(reg_input).sum()  # For AffectNet BS=256; FERplus BS=256
         #
         #     '''余弦相似度'''
-        #     # x_cos = x
-        #     # x_text_feature = text_feature.mean(dim=1)
-        #     # x_text_feature = x_text_feature / x_text_feature.norm(dim=-1, keepdim=True).float()  # (32,512)
-        #     # cosine_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
-        #     # # I_text_cos = 2 * self.loss_cos(F.normalize(x_cos, dim=-1), x_text_feature, cosine_sim_label)
-        #     # I_text_cos = self.loss_cos(F.normalize(x_cos, dim=-1), x_text_feature, cosine_sim_label)
-        #     # # inv_text_feature = inv_text_feature / inv_text_feature.norm(dim=-1, keepdim=True).float()
-        #     # # inv_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
-        #     # # inv_text_cos = 5 * self.loss_cos(F.normalize(x_cos, dim=-1), inv_text_feature, inv_sim_label)
-        #     # # I_text_cos = I_text_cos + inv_text_cos
-        #     '''OPL'''
         #     x_cos = x
         #     x_text_feature = text_feature.mean(dim=1)
         #     x_text_feature = x_text_feature / x_text_feature.norm(dim=-1, keepdim=True).float()  # (32,512)
@@ -561,52 +541,17 @@ class Model(nn.Module):
         #     # mask_pos = mask.masked_fill(eye, 0).float()
         #     mask_pos = mask.float()
         #     mask_neg = (~mask).float()
-        #     dot_prod = torch.matmul(x_cos, x_text_feature.t())  # 6*6 样本之间计算余弦相似性
+        #     dot_prod = torch.matmul(x_cos, x_text_feature.t())  
         #     pos_pairs_mean = (mask_pos * dot_prod).sum() / (mask_pos.sum() + 1e-6)  # 同类样本相似性之和/同类样本数=单个同类样本间的相似性
         #     neg_pairs_mean = torch.abs(mask_neg * dot_prod).sum() / (
         #             mask_neg.sum() + 1e-6)  # 异类样本相似性之和/异类样本数=单个异类样本间的相似性
         #     I_text_cos = (1.0 - pos_pairs_mean) + (2 * neg_pairs_mean)
-        #     # I_text_cos = 0.1*I_text_cos
-        #     # I_text_cos = (1.0 - pos_pairs_mean)
-        #     # inv_text_feature = inv_text_feature / inv_text_feature.norm(dim=-1, keepdim=True).float()
-        #     # inv_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
-        #     # inv_text_cos = 5 * self.loss_cos(F.normalize(x_cos, dim=-1), inv_text_feature, inv_sim_label)
-        #     # I_text_cos = I_text_cos + inv_text_cos
-        #
-        #     '''计算图像与文本间相互的KL散度，使图像的特征逼近领域不变性特征'''
-        #     # # 1. 特征处理（不变）
-        #     # prompt_feature = self.tmp_promt_feature / self.tmp_promt_feature.norm(dim=-1, keepdim=True).float()     # (7,9,512)
-        #     # prompt_feature = prompt_feature.view(len(self.classes) * len(self.clip_templates), -1)      # (63,512)
-        #     # cos_sim = torch.matmul(x_cos, prompt_feature.T).view(-1, len(self.classes), len(self.clip_templates))   # (32,512)*(512,63)-->(32,7,9)
-        #     #
-        #     # # 2. 预计算概率和对数概率
-        #     # prob_per_template = torch.softmax(cos_sim, dim=1)  # (batch, classes, templates)
-        #     # log_prob_per_template = F.log_softmax(cos_sim, dim=1)  # (batch, classes, templates)
-        #     #
-        #     # # 3. 向量化计算所有模板对的对称KL散度
-        #     # batch_size, num_classes, num_templates = prob_per_template.shape
-        #     #
-        #     # # 扩展维度以匹配j和k
-        #     # log_prob_j = log_prob_per_template.unsqueeze(-1)  # (batch, classes, templates, 1)
-        #     # prob_j = prob_per_template.unsqueeze(-1)  # (batch, classes, templates, 1)
-        #     # log_prob_k = log_prob_per_template.unsqueeze(2)  # (batch, classes, 1, templates)
-        #     # prob_k = prob_per_template.unsqueeze(2)  # (batch, classes, 1, templates)
-        #     #
-        #     # # 计算KL(j||k)和KL(k||j)，并沿类别维度求和
-        #     # kl_jk = torch.sum(prob_j * (log_prob_j - log_prob_k), dim=1)  # (batch, templates, templates)
-        #     # kl_kj = torch.sum(prob_k * (log_prob_k - log_prob_j), dim=1)  # (batch, templates, templates)
-        #     # symmetric_kl = (kl_jk + kl_kj) / 2  # (batch, templates, templates)
-        #     #
-        #     # # 4. 筛选j < k的有效对并求平均
-        #     # mask = torch.triu(torch.ones(num_templates, num_templates, device=symmetric_kl.device), diagonal=1).bool()
-        #     # L_kl = symmetric_kl[:, mask].mean()  # 最终标量损失
-        #
+
         # else:
         #     pass
         if phase == 'train':
             # A = self.supervisor(x, targets, cnum=73)
             # # return out, I_text_cos
-            # sep_loss = 1.5*A[0] + 5*A[1]
             # return out, [L1_reg, I_text_cos, sep_loss]
             # return out, [L1_reg, I_text_cos, domain_feature_relation_loss]
             return out, [L1_reg, I_text_cos]
@@ -698,4 +643,5 @@ def Mask(nb_batch):
     bar = torch.from_numpy(bar)
     bar = bar.cuda()
     bar = Variable(bar)
+
     return bar
