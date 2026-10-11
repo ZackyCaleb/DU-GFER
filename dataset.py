@@ -42,8 +42,8 @@ def create_dataset(domain_folders):
         # 遍历每个表情类别文件夹
         # img_path = glob.glob(folder_path + '/*/*/*')
         img_path = glob.glob(folder_path + '/*/*')
-        exp_label = [int(i.split('/')[-2]) for i in img_path]
-        # exp_label = [int(i.split('\\')[-2]) for i in img_path]
+        # exp_label = [int(i.split('/')[-2]) for i in img_path]
+        exp_label = [int(i.split('\\')[-2]) for i in img_path]
         dom_label = [domain_id for i in img_path]
 
         image_paths.extend(img_path)

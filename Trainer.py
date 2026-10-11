@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+# from LibMTL.weighting.abstract_weighting import AbsWeighting
+# from LibMTL.LibMTL.weighting import DB_MTL
 
 class traniner(object):
     def __init__(self, args):
         self.args = args
         # self.da = DB_MTL()
-    def train(self, model, train_loader, optimizer, scheduler, device, ratio):
+    def train(self, model, train_loader, optimizer, scheduler, device, lam1, lam2, lam3):
         running_loss = 0.0
         iter_cnt = 0
         correct_sum = 0
@@ -20,10 +21,7 @@ class traniner(object):
             imgs1 = imgs1.to(device)
             labels = labels.to(device)
 
-            criterion = nn.CrossEntropyLoss(reduction='none')
-
-            output, MC_loss = model(imgs1, labels, phase='train', ratio=ratio)
-
+            output, MC_loss = model(imgs1, labels, 'train', lam1, lam2, lam3)
             loss1 = nn.CrossEntropyLoss()(output, labels)
             loss = loss1 + MC_loss[0] + MC_loss[1]
 
@@ -72,6 +70,5 @@ class traniner(object):
 
             running_loss = running_loss / iter_cnt
             test_acc = correct_sum.float() / float(data_num)
-
 
         return test_acc, running_loss

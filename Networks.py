@@ -339,7 +339,16 @@ class Model(nn.Module):
         #     'tears, a downward turned mouth, drooping upper eyelids, and a wrinkled forehead.',
         #     'furrowed eyebrows, narrow eyes, tightened lips, and flared nostrils.',
         #     'relaxed facial muscles, a straight mouth, a smooth forehead, and unremarkable eyebrows.']
-
+        #
+        # # '''What are useful facial muscular movements for the facial expression of neutral? please summarizing these information as a sentence'''
+        # # self.class_descriptor=[
+        # #     "surprise is the frontalis muscle raising the eyebrows and the levator palpebrae superioris widening the eyes, often accompanied by the masseter and pterygoid muscles dropping the jaw open.",
+        # #     "fear is the frontalis muscle raising the eyebrows, the levator palpebrae superioris widening the eyes, and the platysma and associated muscles stretching the lips horizontally.",
+        # #     "disgust is the levator labii superioris and alaque nasi muscles raising the upper lip and wrinkling the nose, as if to block an offensive odor.",
+        # #     "happiness are the combined action of the zygomaticus major pulling the lips up and back and the orbicularis oculi tightening to raise the cheeks and create crow's feet around the eyes.",
+        # #     "sadness is the corrugator supercilii and depressor glabellae pulling the inner eyebrows upward and together, combined with the depressor anguli oris pulling the corners of the mouth downward.",
+        # #     "anger is the corrugator supercilii and procerus muscles lowering and furrowing the eyebrows, combined with the orbicularis oris and mentalis tightening the lips and pushing up the chin.",
+        # #     "neutral facial expression is the minimal engagement of facial muscles, resulting in relaxed frontalis (smooth forehead), orbicularis oculi (soft eyes), and zygomaticus and depressor muscles (a relaxed, non-upturned or downturned mouth)."]
         '''Deepseek'''
         # self.class_descriptor =[
         #     "frontalis raising eyebrows and levator palpebrae widening eyes",
@@ -378,7 +387,6 @@ class Model(nn.Module):
         # fc_in_dim = 512
         '''加载ResNet18网络'''
         res18 = ResNet(block=BasicBlock, n_blocks=[2, 2, 2, 2], channels=[64, 128, 256, 512], output_dim=1000)
-        # msceleb_model = torch.load(r'./pretrained/resnet18_msceleb.pth', map_location=device)  # 加载到指定设备
         msceleb_model = torch.load(r'./pretrained/resnet18_msceleb.pth', map_location=self.device,
                                    weights_only=True)  # 加载到指定设备
         state_dict = msceleb_model['state_dict']
@@ -427,7 +435,7 @@ class Model(nn.Module):
         return [loss_1, loss_2]
         # return loss_1
 
-    def forward(self, x, targets, phase='train', ratio=0.1):
+    def forward(self, x, targets, phase, lam1, lam2, lam3):
         # 将输入放到指定设备
         x = x.to(self.device)
         # img = x
@@ -492,66 +500,115 @@ class Model(nn.Module):
         # 以ResNet输出的特征为加权值去修饰CLIP输出的特征，使CLIP的输出特征保留与表情相关的语义
 
         out = self.fc(x)
-        # if phase == 'train':
-        #     xf = x
-        #
-        #     def loss_fn(xf_single, text_single):
-        #         """仅计算损失，不处理梯度"""
-        #         dot_product = torch.dot(xf_single, text_single)
-        #         xf_norm = torch.norm(xf_single)
-        #         text_norm = torch.norm(text_single)
-        #         cos_sim = dot_product / (xf_norm * text_norm + 1e-8)
-        #         return cos_sim  # 返回损失值，不计算梯度
-        #
-        #     grad_fn = torch.func.grad(loss_fn)  # grad_fn(xf, text)会返回loss对xf的梯度
-        #     per_sample_vmap = torch.vmap(grad_fn, in_dims=(None, 0))    # (512,) (9, 512)
-        #     batch_vmap = torch.vmap(per_sample_vmap, in_dims=(0, 0))    # 按照批次的维度计算梯度
-        #     xf_grad = batch_vmap(xf, text_feature)  #(32,512)+(32,9,512)-->(512,)+(9,512)-->(512,)+(512,)-->最后合并
-        #
-        #     '''ResNet18_reg2_Text_final_R2Others.pth'''
-        #     # 先聚合所有模板的影响力, 再选择通道
-        #     channel_impact = xf_grad.abs() * xf.abs().unsqueeze(1)  # (32,80,512) |grad|*|input|
-        #     # # channel_impact = xf_grad.abs() * xf.unsqueeze(1)  # (32,80,512)  cvpr2025
-        #     # # channel_impact = xf_grad.abs()  # (32,80,512)  |grad|  tpami2024
-        #     channel_impact_aggregated = channel_impact.mean(dim=1)  # (32, 512)
-        #     mu = channel_impact_aggregated.mean(dim=1, keepdim=True)  # (32, 1)
-        #     std = channel_impact_aggregated.std(dim=1, keepdim=True)  # (32, 1)
-        #     mask_aggregated = channel_impact_aggregated > (mu + 1.0 * std)  # (32, 512)
-        #     # mask_aggregated = channel_impact_aggregated > (mu + 0.5 * std)  # (32, 512)
-        #     # mask_aggregated = channel_impact_aggregated > (mu + 2.0 * std)  # (32, 512)
-        #     # mask_aggregated = channel_impact_aggregated > mu  # (32, 512)
-        #     # 阈值法筛选敏感性
-        #     # maximum, _ = channel_impact_aggregated.median(dim=1)
-        #     # mask_aggregated = channel_impact_aggregated > maximum.unsqueeze(dim=1).repeat(1, 512)
-        #     # # maximum, _ = channel_impact_aggregated.max(dim=1)
-        #     # # maximum = maximum / 2
-        #     # # mask_aggregated = channel_impact_aggregated > maximum.unsqueeze(dim=1).repeat(1, 512)
-        #     reg_input = xf * mask_aggregated.float()
-        #     L1_reg = 0.01 * torch.abs(reg_input).sum()
-        #     # L1_reg = 0.001 * torch.abs(reg_input).sum()  # For AffectNet BS=256; FERplus BS=256
-        #
-        #     '''余弦相似度'''
-        #     x_cos = x
-        #     x_text_feature = text_feature.mean(dim=1)
-        #     x_text_feature = x_text_feature / x_text_feature.norm(dim=-1, keepdim=True).float()  # (32,512)
-        #     x_cos = F.normalize(x_cos, p=2, dim=-1)
-        #     labels = targets[:, None]  # extend dim
-        #     mask = torch.eq(labels, labels.t()).bool().to(x_cos.device)
-        #     # eye = torch.eye(mask.shape[0], mask.shape[1]).bool().to(x_cos.device)
-        #     # mask_pos = mask.masked_fill(eye, 0).float()
-        #     mask_pos = mask.float()
-        #     mask_neg = (~mask).float()
-        #     dot_prod = torch.matmul(x_cos, x_text_feature.t())  
-        #     pos_pairs_mean = (mask_pos * dot_prod).sum() / (mask_pos.sum() + 1e-6)  # 同类样本相似性之和/同类样本数=单个同类样本间的相似性
-        #     neg_pairs_mean = torch.abs(mask_neg * dot_prod).sum() / (
-        #             mask_neg.sum() + 1e-6)  # 异类样本相似性之和/异类样本数=单个异类样本间的相似性
-        #     I_text_cos = (1.0 - pos_pairs_mean) + (2 * neg_pairs_mean)
+        if phase == 'train':
+            xf = x
 
-        # else:
-        #     pass
+            def loss_fn(xf_single, text_single):
+                """仅计算损失，不处理梯度"""
+                dot_product = torch.dot(xf_single, text_single)
+                xf_norm = torch.norm(xf_single)
+                text_norm = torch.norm(text_single)
+                cos_sim = dot_product / (xf_norm * text_norm + 1e-8)
+                return cos_sim  # 返回损失值，不计算梯度
+
+            grad_fn = torch.func.grad(loss_fn)  # grad_fn(xf, text)会返回loss对xf的梯度
+            per_sample_vmap = torch.vmap(grad_fn, in_dims=(None, 0))    # (512,) (9, 512)
+            batch_vmap = torch.vmap(per_sample_vmap, in_dims=(0, 0))    # 按照批次的维度计算梯度
+            xf_grad = batch_vmap(xf, text_feature)  #(32,512)+(32,9,512)-->(512,)+(9,512)-->(512,)+(512,)-->最后合并
+
+            '''ResNet18_reg2_Text_final_R2Others.pth'''
+            # 先聚合所有模板的影响力, 再选择通道
+            channel_impact = xf_grad.abs() * xf.abs().unsqueeze(1)  # (32,80,512) |grad|*|input|
+            # # channel_impact = xf_grad.abs() * xf.unsqueeze(1)  # (32,80,512)  cvpr2025
+            # # channel_impact = xf_grad.abs()  # (32,80,512)  |grad|  tpami2024
+            channel_impact_aggregated = channel_impact.mean(dim=1)  # (32, 512)
+            mu = channel_impact_aggregated.mean(dim=1, keepdim=True)  # (32, 1)
+            std = channel_impact_aggregated.std(dim=1, keepdim=True)  # (32, 1)
+            # mask_aggregated = channel_impact_aggregated > (mu + 1.0 * std)  # (32, 512)
+            mask_aggregated = channel_impact_aggregated > (mu + lam2 * std)  # (32, 512)
+            # mask_aggregated = channel_impact_aggregated > (mu + 0.5 * std)  # (32, 512)
+            # mask_aggregated = channel_impact_aggregated > (mu + 2.0 * std)  # (32, 512)
+            # mask_aggregated = channel_impact_aggregated > mu  # (32, 512)
+            # 阈值法筛选敏感性
+            # maximum, _ = channel_impact_aggregated.median(dim=1)
+            # mask_aggregated = channel_impact_aggregated > maximum.unsqueeze(dim=1).repeat(1, 512)
+            # # maximum, _ = channel_impact_aggregated.max(dim=1)
+            # # maximum = maximum / 2
+            # # mask_aggregated = channel_impact_aggregated > maximum.unsqueeze(dim=1).repeat(1, 512)
+            reg_input = xf * mask_aggregated.float()
+            L1_reg = lam3 * torch.abs(reg_input).sum()
+            # L1_reg = lam3 * torch.abs(reg_input).sum(dim=1).mean()
+
+            '''余弦相似度'''
+            # x_cos = x
+            # x_text_feature = text_feature.mean(dim=1)
+            # x_text_feature = x_text_feature / x_text_feature.norm(dim=-1, keepdim=True).float()  # (32,512)
+            # cosine_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
+            # # I_text_cos = 2 * self.loss_cos(F.normalize(x_cos, dim=-1), x_text_feature, cosine_sim_label)
+            # I_text_cos = self.loss_cos(F.normalize(x_cos, dim=-1), x_text_feature, cosine_sim_label)
+            # # inv_text_feature = inv_text_feature / inv_text_feature.norm(dim=-1, keepdim=True).float()
+            # # inv_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
+            # # inv_text_cos = 5 * self.loss_cos(F.normalize(x_cos, dim=-1), inv_text_feature, inv_sim_label)
+            # # I_text_cos = I_text_cos + inv_text_cos
+            '''OPL'''
+            x_cos = x
+            x_text_feature = text_feature.mean(dim=1)
+            x_text_feature = x_text_feature / x_text_feature.norm(dim=-1, keepdim=True).float()  # (32,512)
+            x_cos = F.normalize(x_cos, p=2, dim=-1)
+            labels = targets[:, None]  # extend dim
+            mask = torch.eq(labels, labels.t()).bool().to(x_cos.device)
+            # eye = torch.eye(mask.shape[0], mask.shape[1]).bool().to(x_cos.device)
+            # mask_pos = mask.masked_fill(eye, 0).float()
+            mask_pos = mask.float()
+            mask_neg = (~mask).float()
+            dot_prod = torch.matmul(x_cos, x_text_feature.t())  # 6*6 样本之间计算余弦相似性
+            pos_pairs_mean = (mask_pos * dot_prod).sum() / (mask_pos.sum() + 1e-6)  # 同类样本相似性之和/同类样本数=单个同类样本间的相似性
+            neg_pairs_mean = torch.abs(mask_neg * dot_prod).sum() / (
+                    mask_neg.sum() + 1e-6)  # 异类样本相似性之和/异类样本数=单个异类样本间的相似性
+            # I_text_cos = (1.0 - pos_pairs_mean) + (2 * neg_pairs_mean)
+            I_text_cos = (1.0 - pos_pairs_mean) + (lam1 * neg_pairs_mean)
+
+            # I_text_cos = 0.1*I_text_cos
+            # I_text_cos = (1.0 - pos_pairs_mean)
+            # inv_text_feature = inv_text_feature / inv_text_feature.norm(dim=-1, keepdim=True).float()
+            # inv_sim_label = torch.ones(x_cos.shape[0]).to(self.device)
+            # inv_text_cos = 5 * self.loss_cos(F.normalize(x_cos, dim=-1), inv_text_feature, inv_sim_label)
+            # I_text_cos = I_text_cos + inv_text_cos
+
+            '''计算图像与文本间相互的KL散度，使图像的特征逼近领域不变性特征'''
+            # # 1. 特征处理（不变）
+            # prompt_feature = self.tmp_promt_feature / self.tmp_promt_feature.norm(dim=-1, keepdim=True).float()     # (7,9,512)
+            # prompt_feature = prompt_feature.view(len(self.classes) * len(self.clip_templates), -1)      # (63,512)
+            # cos_sim = torch.matmul(x_cos, prompt_feature.T).view(-1, len(self.classes), len(self.clip_templates))   # (32,512)*(512,63)-->(32,7,9)
+            #
+            # # 2. 预计算概率和对数概率
+            # prob_per_template = torch.softmax(cos_sim, dim=1)  # (batch, classes, templates)
+            # log_prob_per_template = F.log_softmax(cos_sim, dim=1)  # (batch, classes, templates)
+            #
+            # # 3. 向量化计算所有模板对的对称KL散度
+            # batch_size, num_classes, num_templates = prob_per_template.shape
+            #
+            # # 扩展维度以匹配j和k
+            # log_prob_j = log_prob_per_template.unsqueeze(-1)  # (batch, classes, templates, 1)
+            # prob_j = prob_per_template.unsqueeze(-1)  # (batch, classes, templates, 1)
+            # log_prob_k = log_prob_per_template.unsqueeze(2)  # (batch, classes, 1, templates)
+            # prob_k = prob_per_template.unsqueeze(2)  # (batch, classes, 1, templates)
+            #
+            # # 计算KL(j||k)和KL(k||j)，并沿类别维度求和
+            # kl_jk = torch.sum(prob_j * (log_prob_j - log_prob_k), dim=1)  # (batch, templates, templates)
+            # kl_kj = torch.sum(prob_k * (log_prob_k - log_prob_j), dim=1)  # (batch, templates, templates)
+            # symmetric_kl = (kl_jk + kl_kj) / 2  # (batch, templates, templates)
+            #
+            # # 4. 筛选j < k的有效对并求平均
+            # mask = torch.triu(torch.ones(num_templates, num_templates, device=symmetric_kl.device), diagonal=1).bool()
+            # L_kl = symmetric_kl[:, mask].mean()  # 最终标量损失
+
+        else:
+            pass
         if phase == 'train':
             # A = self.supervisor(x, targets, cnum=73)
             # # return out, I_text_cos
+            # sep_loss = 1.5*A[0] + 5*A[1]
             # return out, [L1_reg, I_text_cos, sep_loss]
             # return out, [L1_reg, I_text_cos, domain_feature_relation_loss]
             return out, [L1_reg, I_text_cos]
@@ -643,5 +700,4 @@ def Mask(nb_batch):
     bar = torch.from_numpy(bar)
     bar = bar.cuda()
     bar = Variable(bar)
-
     return bar
