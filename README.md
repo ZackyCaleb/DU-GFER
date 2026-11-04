@@ -24,4 +24,4 @@ python main.py
 
 ## Acknowledgment
 1. [Zhang Y, Zheng X, Liang C, et al. Generalizable facial expression recognition[C]//European Conference on Computer Vision. Cham: Springer Nature Switzerland, 2024: 231-248.](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/02196.pdf)
-
+2. [Saqib et. al, QT-DoG: Quantization-Aware Training for Domain Generalization [C].// Proceedings of the 42nd International Conference on Machine Learning, 2025:26981-27004.](https://saqibjaved1.github.io/QT_DoG/)
